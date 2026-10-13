@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"riskset\\\\$\\\\|names\\(riskset\\\\|colnames\" /Users/bgibson/Projects/llrem/R/riskset.R)",
+      "Bash(grep -n \"riskset\\\\$[A-Za-z]\" /Users/bgibson/Projects/llrem/R/riskset.R)",
+      "Bash(grep \"\\\\.R$\")",
+      "Bash(Rscript --vanilla -e ' *)",
+      "Bash(Rscript *)",
+      "WebFetch(domain:scholar.google.com)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:api.semanticscholar.org)",
+      "WebFetch(domain:www.semanticscholar.org)",
+      "WebFetch(domain:aclanthology.org)",
+      "WebFetch(domain:dl.acm.org)",
+      "WebFetch(domain:proceedings.mlr.press)"
+    ]
+  }
+}

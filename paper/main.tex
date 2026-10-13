@@ -1,0 +1,863 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{natbib}
+\usepackage{graphicx}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+\usepackage{float}
+\usepackage[top=3cm, bottom=3cm, right=3cm, left=3cm]{geometry}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{authblk}
+\usepackage{multirow}
+
+\newcommand{\placeholder}[1]{\textcolor{gray}{\textit{[#1]}}}
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+\title{Do LLMs Interact Like Humans? \\ Endogenous Interaction Dynamics Under Roleplay \\ and Prediction Conditions Across Nine Social Domains}
+
+\author[1]{C. Ben Gibson}
+\affil[1]{\placeholder{Department, Institution, City, Country}}
+
+\begin{document}
+
+\maketitle
+
+\noindent\textbf{Corresponding author:} C. Ben Gibson,
+\placeholder{email@institution.edu}
+
+\begin{abstract}
+Large language models (LLMs) are increasingly deployed as social simulation
+agents, yet it remains unclear whether they reproduce the structural dynamics
+that govern human interaction sequences. We evaluate two LLMs---Claude Haiku
+4.5 and Llama 3.1 70B---under two conditions that differ in how much
+structural scaffolding is provided: a \emph{roleplay} condition, in which each
+LLM is assigned a sender identity and selects only a receiver (with sender
+activation governed by an empirically fitted relational event model), and a
+\emph{predict} condition, in which the LLM observes the empirical event
+history and predicts both the next sender and receiver with no structural
+scaffolding. We compare the resulting sequences against human empirical
+baselines on nine endogenous statistics from the relational event model
+literature, across 27 networks spanning nine social domains. The two
+conditions reveal sharply different failure modes. In the roleplay condition,
+both LLMs systematically \emph{over-produce} history-dependent statistics:
+too much dyadic repetition (Claude $+97\%$, Llama $+44\%$), too much
+reverse-dyad recency concentration ($+61\%$ for both), and dramatically
+too much contact breadth ($+189\%$ and $+227\%$), while under-producing
+interaction-order violations ($-26\%$ for both). In the predict condition,
+Claude \emph{reverses} these biases, sharply under-producing the same
+history-dependent statistics (SndInitiation $-55\%$, Repetition $-80\%$,
+RecRecencyRank $-72\%$) while over-producing norm violations ($+44\%$),
+yielding lower overall RMSE (0.33) than in roleplay (1.66) but through
+cancellation rather than accuracy. Llama in the predict condition is
+strikingly well-calibrated (RMSE 0.19), reproducing most statistics close
+to human baselines without identity assignment. The contrast between
+conditions---over-endogeneity under roleplay, under-endogeneity under
+prediction for Claude, and near-accuracy for Llama---has implications for
+how LLMs should be deployed in social simulation and for what these models
+have internalized about human interaction dynamics.
+\end{abstract}
+
+\noindent\textbf{Keywords:} large language models; social simulation; relational
+event models; interaction dynamics; agent-based modeling; endogenous statistics;
+roleplay; prediction
+
+\newpage
+
+%------------------------------------------------------------------
+\section{Introduction}
+
+A growing body of work uses large language models (LLMs) as computational
+proxies for human social behavior. LLM agents have been deployed to simulate
+opinion dynamics \citep{argyle2023out}, political deliberation
+\citep{manning2024automated}, jury decision-making, and economic games
+\citep{horton2023large,aher2023using}, with researchers variously concluding that
+LLMs are plausible synthetic survey respondents, strategic actors, and social
+reasoners. A parallel literature in organizational science and computational
+social science employs LLMs as interacting agents in network simulations,
+leveraging their world knowledge to generate scenario-conditioned behavior at
+scale. Both applications rest on an implicit empirical claim: that LLM behavior
+in the relevant domain resembles human behavior closely enough to serve as a
+valid substitute.
+
+This claim has received less direct empirical scrutiny than the enthusiasm
+surrounding LLM social simulation might suggest. Most evaluations focus on
+macro-level outcomes---whether aggregate opinion distributions match survey
+data, whether strategic equilibria are reproduced, whether argumentation
+patterns resemble human debates. Micro-level sequencing---the fine-grained,
+moment-to-moment dynamics of who interacts with whom, in what order, and
+how that pattern evolves over time---has received much less attention. Yet
+these dynamics are precisely what social network researchers study, and they
+are what matters most for simulation applications where the quality of
+simulated trajectories, not just their endpoints, is the object of interest.
+
+We address this gap by evaluating LLM-generated interaction sequences against
+human empirical baselines on nine endogenous statistics drawn from the
+relational event model (REM) literature \citep{butts_sm_2008,gibson2025four},
+across 27 networks spanning nine social domains. Crucially, we evaluate LLMs
+under two conditions that differ in the degree of structural scaffolding
+provided.
+
+In the \emph{roleplay} condition, each LLM is assigned a specific sender
+identity and asked to select a receiver. Sender activation at each step is
+governed by the hazard surface of an empirically fitted REM, concentrating
+event production on actors whose prior interaction history places them at
+elevated hazard. The LLM's task is narrow: given your identity and recent
+history, who do you target next?
+
+In the \emph{predict} condition, the LLM receives the same empirical event
+history but is asked to predict both the next sender and the next receiver,
+with no REM structural scaffolding. This is a harder and qualitatively
+different task: the LLM must represent the full distribution over
+(sender, receiver) pairs and draw from an implicit model of
+who acts and who they target.
+
+The two conditions operationalize a conceptual distinction between
+\emph{identity-conditioned behavior}---acting as a specific social agent---and
+\emph{social forecasting}---predicting what will happen in a social sequence.
+We hypothesize that identity assignment will amplify endogenous
+history-responsiveness, because the roleplay frame invites the LLM to adopt
+the perspective of a persistent actor with established relationships and
+obligations. The predict frame, by contrast, requires the LLM to represent
+population-level tendencies rather than individual behavioral dispositions,
+which may yield different calibration properties.
+
+Our results confirm this hypothesis but with a more nuanced pattern than
+anticipated. In the roleplay condition, both LLMs \emph{over-produce}
+endogenous structure across most statistics, behaving as if the pull of
+interaction history is stronger than it is for humans. In the predict
+condition, Claude reverses this pattern and sharply \emph{under-produces}
+history-dependent statistics, while Llama turns out to be nearly
+well-calibrated overall. The contrast---over-endogeneity under roleplay,
+under-endogeneity under prediction (for Claude), and implicit accuracy under
+prediction (for Llama)---suggests that the two models have different
+internal representations of social interaction dynamics, and that these
+representations are expressed differently depending on whether the LLM is
+asked to act or to forecast.
+
+The remainder of the paper proceeds as follows. Section~\ref{sec:background}
+reviews endogenous REM statistics and prior work on LLMs as social simulation
+agents. Section~\ref{sec:methods} describes the data, conditions, and
+evaluation metrics. Section~\ref{sec:results} reports results for both
+conditions and their comparison. Section~\ref{sec:discussion} discusses
+interpretations and implications.
+
+%------------------------------------------------------------------
+\section{Background}
+\label{sec:background}
+
+\subsection{Endogenous Structure in Relational Event Sequences}
+
+The relational event model \citep{butts_sm_2008} represents directed social
+interaction as a continuous-time point process in which the hazard that actor
+$i$ directs an event to actor $j$ at time $t$ depends on the full prior event
+history:
+\[
+  \lambda_{ijt} = \lambda_0(t)\exp\!\left(\boldsymbol{\beta}^\top
+  \mathbf{s}_{ijt}\right),
+\]
+where $\mathbf{s}_{ijt}$ is a vector of endogenous statistics computed from
+events up to time $t$. The framework has been applied to email and phone
+communication \citep{vu2017relational}, hospital patient transfers
+\citep{liang2014organizational}, organizational deliberation
+\citep{kitts2017investigating}, gang conflict \citep{duxbury2021shining,%
+gravel2023rivalries}, and international conflict \citep{renshaw2023modeling}.
+
+\citet{gibson2025four} applied greedy forward model selection to 217 empirical
+interaction sequences across nine social domains and identified four statistics
+that appear in the first four selection steps in over 60\% of networks:
+\textit{SndInitiation} (whether the sender has ever previously contacted the
+receiver), \textit{IOviolation} (indicator of participation-shift violations),
+\textit{Repetition} (sender's normalized prior send-share to the receiver), and
+\textit{RecRecencyRank} (rank-based recency of the most recent reverse-dyad
+event). These four terms, representing dyadic persistence, sequential ordering,
+and reverse-dyad recency, constitute a robust endogenous baseline that
+generalizes across ecological contexts from private messaging to gang violence.
+
+An ecological distinction that shapes which endogenous statistics dominate is
+the \emph{visibility} of interaction histories: whether participants can observe
+each other's behavior \citep{gibson2025four}. In high-visibility settings
+(classrooms, public conflict, Twitter), imitation and reverse-dyad recency are
+more predictive because others' targeting behavior is observable. In
+low-visibility settings (private email, phone, SMS), actors access only their
+own interaction history, so dyadic persistence and sequential norms dominate.
+
+\subsection{LLMs as Social Simulation Agents}
+
+The use of LLMs as synthetic social agents has grown rapidly since the
+release of instruction-tuned models. Early work established that LLMs can
+reproduce statistical patterns in survey responses when prompted to adopt
+specific demographic profiles \citep{argyle2023out}, though subsequent work
+documented systematic biases and over-homogenization
+\citep{santurkar2023whose,park2024generative}. In strategic interaction
+settings, LLMs demonstrate economically rational behavior with characteristic
+deviations from Nash equilibria \citep{horton2023large}. Generative agent
+architectures \citep{park2023generative} have extended LLM simulation to
+multi-agent settings where agents maintain memories and coordinate behavior
+over extended sequences.
+
+A growing body of work documents that persona and roleplay prompting
+systematically distorts LLM behavior relative to neutral or direct prompting.
+\citet{shanahan2023role} argue that LLMs in deep roleplay are best understood
+as \emph{simulating} a character rather than becoming one, and identify
+\emph{character capture}---the tendency for strong roleplay framing to
+override the model's baseline values and behavioral dispositions---as a
+central failure mode of identity-based prompting. Empirically,
+\citet{cheng2023compost} find that LLMs roleplaying demographic groups
+systematically exaggerate stereotypical traits, producing what they term
+\emph{caricature}: the assigned persona amplifies group-typical tendencies
+beyond what real members of that group would exhibit.
+\citet{salewski2023context} similarly show that impersonating specific
+personas shifts task performance and expressed opinions in
+stereotype-consistent directions. Taken together, these results suggest that
+identity assignment does not produce an accurate simulation of the target
+actor; it produces a \emph{heightened} version of whatever tendencies the
+model associates with that identity. \citet{tseng2024two} survey the
+distinction between role-playing and personalization in LLMs, arguing that
+the two paradigms have distinct failure modes that are frequently conflated
+in evaluation.
+
+An important distinction in LLM simulation is between \emph{identity-based}
+prompting---assigning the model a specific actor's role and history---and
+\emph{predictive} prompting---asking the model to forecast what a social
+sequence will produce next. Prior work on LLM simulation of conflict
+sequences found that sender roleplay substantially outperforms prediction on
+REM statistics, with identity assignment (not merely history observation)
+driving the accuracy improvement \citep{gibson2024llm}. That work evaluated
+a single domain; here we extend the comparison across nine domains and
+examine how the two framing conditions produce different patterns of
+systematic bias.
+
+%------------------------------------------------------------------
+\section{Methods}
+\label{sec:methods}
+
+\subsection{Empirical Corpora}
+
+The evaluation draws on 27 networks across nine social domains:
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{War} (international conflict, MID dataset):
+        directed conflict acts among states.
+        High-visibility, conflictual. ($n=1$ network)
+  \item \textbf{Classroom}: directed spoken interaction in a high-school
+        classroom. High-visibility, affiliative. ($n=1$)
+  \item \textbf{Gangs}: directed violent acts among urban street gangs.
+        High-visibility, conflictual. ($n=5$)
+  \item \textbf{Twitter}: directed replies and mentions.
+        High-visibility, affiliative. ($n=1$)
+  \item \textbf{Phone}: phone calls in a military command-and-control exercise.
+        High-visibility, affiliative. ($n=1$)
+  \item \textbf{Email}: university email sequences.
+        Low-visibility, affiliative. ($n=5$)
+  \item \textbf{ftf (face-to-face)}: directed gaze sequences during a group task.
+        Low-visibility, affiliative. ($n=5$)
+  \item \textbf{PMs (private messages)}: UCI online private message sequences.
+        Low-visibility, affiliative. ($n=5$)
+  \item \textbf{SMS}: short message service sequences.
+        Low-visibility, affiliative. ($n=3$)
+\end{itemize}
+
+For each network, the empirical sequence serves as the human baseline
+against which LLM-generated sequences are compared on nine endogenous
+statistics.
+
+\subsection{LLM Providers}
+
+Two LLM providers are evaluated throughout:
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{Claude Haiku 4.5} (Anthropic), via AWS Bedrock
+  \item \textbf{Llama 3.1 70B} (Meta), via AWS Bedrock
+\end{itemize}
+
+\subsection{Experimental Conditions}
+
+\paragraph{Roleplay condition.}
+Each LLM is assigned the identity of a specific sender at each event step and
+asked to select a receiver from the available actors, given the last 30 events
+as context. Sender activation at each step is governed by the hazard surface
+of an empirically fitted REM: at each tick, sender activation probabilities
+$p_i(t)$ are derived by marginalizing the Cox partial hazard over receivers
+and normalizing, concentrating activations on actors whose prior interaction
+history places them at elevated hazard. The LLM's task is narrow: ``You are
+[Actor $i$]. Given this history, who do you target next?'' This condition
+provides structural scaffolding for the \emph{sender} dimension while leaving
+the \emph{receiver} selection to the LLM.
+
+\paragraph{Predict condition.}
+The LLM receives the same empirical event history (last 30 events) at each
+step but is asked to predict both the next sender and the next receiver,
+with no REM structural scaffolding. The LLM sees the true historical sequence
+up to each event step (\texttt{use\_empirical\_history = TRUE}) and is prompted
+to name the next (sender, receiver) pair. This is a harder and qualitatively
+different task: rather than acting as a specific agent, the LLM must forecast
+the next event from a population-level model of interaction.
+
+The contrast between conditions is summarized in
+Table~\ref{tab:conditions}.
+
+\begin{table}[H]
+\centering
+\caption{Summary of experimental conditions.}
+\label{tab:conditions}
+\begin{tabular}{lll}
+\toprule
+ & \textbf{Roleplay} & \textbf{Predict} \\
+\midrule
+LLM task           & Choose receiver only          & Choose sender and receiver \\
+Sender determined by & REM hazard surface           & LLM \\
+Identity assigned  & Yes (specific actor)          & No \\
+History observed   & Last 30 events (LLM-generated) & Last 30 empirical events \\
+REM scaffolding    & Yes (sender activation)       & None \\
+Difficulty         & Lower                         & Higher \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Endogenous Statistics}
+
+Nine endogenous statistics from the REM candidate set of \citet{gibson2025four}
+are evaluated (Table~\ref{tab:terms}). Each is normalized to $[0,1]$ within
+sender at each event time.
+
+\begin{table}[H]
+\centering
+\caption{Endogenous statistics evaluated, organized by conceptual group.}
+\label{tab:terms}
+\begin{tabular}{llp{7.2cm}}
+\toprule
+\textbf{Term} & \textbf{Group} & \textbf{Description} \\
+\midrule
+SndInitiation   & Forward-dyad history   & Binary: sender $i$ has ever previously contacted receiver $j$ \\
+Repetition      & Forward-dyad history   & $i$'s normalized prior send-share to $j$ \\
+RecRecencyRank  & Reverse-dyad history   & Rank-recency of the most recent $j \to i$ event \\
+WeightedRec     & Reverse-dyad history   & Squartini weighted reciprocity ratio \\
+Imitation       & Popularity/closure     & $j$'s normalized indegree from senders other than $i$ \\
+OutDegSnd       & Popularity/closure     & $i$'s normalized contact breadth (sender outdegree) \\
+NOTPSnd         & Popularity/closure     & Normalized transitive two-path count ($i \to k \to j$) \\
+NITPSnd         & Popularity/closure     & Normalized cyclic two-path count ($j \to k \to i$) \\
+IOviolation     & Sequential ordering    & Indicator of a participation-shift violation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Metrics}
+
+For each network and each statistic, bias is the difference between the
+LLM-generated mean and the empirical mean:
+\[
+  \text{bias}_{k} = \bar{s}_{k}^{\text{LLM}} - \bar{s}_{k}^{\text{emp}}.
+\]
+Positive bias indicates the LLM over-produces the pattern; negative
+indicates under-production. Root mean squared error (RMSE) across the nine
+statistics is computed per network:
+\[
+  \text{RMSE} = \sqrt{\frac{1}{9}\sum_{k=1}^{9}
+    \!\left(\bar{s}_{k}^{\text{LLM}} - \bar{s}_{k}^{\text{emp}}\right)^{\!2}}.
+\]
+
+%------------------------------------------------------------------
+\section{Results}
+\label{sec:results}
+
+\subsection{Overall Calibration}
+
+Table~\ref{tab:overall} reports mean bias, mean absolute bias, and
+RMSE for each condition and model. Several patterns stand out immediately.
+
+\begin{table}[H]
+\centering
+\caption{Overall calibration. Mean bias (positive = over-production relative to
+humans), mean absolute bias, and RMSE. Averages are across all 9 statistics
+and 27 networks.}
+\label{tab:overall}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Condition} & \textbf{Model} &
+\textbf{Mean bias} & \textbf{Mean |bias|} & \textbf{RMSE} \\
+\midrule
+\multirow{2}{*}{Roleplay} &
+  Claude Haiku 4.5 & $+0.650$ & $0.737$ & $1.661$ \\
+& Llama 3.1 70B    & $+0.798$ & $0.874$ & $2.024$ \\
+\midrule
+\multirow{2}{*}{Predict} &
+  Claude Haiku 4.5 & $-0.167$ & $0.329$ & $0.329$ \\
+& Llama 3.1 70B    & $+0.040$ & $0.189$ & $0.189$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both models achieve substantially lower RMSE in the predict condition
+than in roleplay (Claude: 0.33 vs.\ 1.66; Llama: 0.19 vs.\ 2.02). For
+Llama, this reflects genuine accuracy: mean bias of $+0.04$ across all
+statistics indicates near-perfect calibration on average. For Claude,
+the lower predict RMSE is partly an artifact of cancellation: the mean
+bias is $-0.17$, reflecting a systematic reversal of the roleplay
+over-production bias, and individual statistics show large under- and
+over-production in opposite directions. In roleplay, both models are
+net positive (over-producers); in predict, Llama is near zero and
+Claude is net negative (under-producer). The models are thus not only
+better calibrated in the predict condition---they have qualitatively
+different failure modes across conditions.
+
+\subsection{Roleplay Condition: Over-Endogeneity}
+
+Table~\ref{tab:roleplay} reports the statistic-level means and percentage
+biases for the roleplay condition. The dominant failure mode is
+over-production of history-dependent statistics.
+
+\begin{table}[H]
+\centering
+\caption{Roleplay condition: mean endogenous statistic values (human empirical
+vs.\ LLM-generated), averaged across all domains and networks.
+\% bias $= (m_{\text{LLM}} - m_{\text{emp}})/m_{\text{emp}}\times 100$.}
+\label{tab:roleplay}
+\begin{tabular}{lrrrrrr}
+\toprule
+\multirow{2}{*}{\textbf{Term}} &
+\multirow{2}{*}{\textbf{Empirical}} &
+\multicolumn{2}{c}{\textbf{Claude (Roleplay)}} &
+\multicolumn{2}{c}{\textbf{Llama (Roleplay)}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+& & \textbf{Mean} & \textbf{\% bias} & \textbf{Mean} & \textbf{\% bias} \\
+\midrule
+OutDegSnd      & 2.399 & 6.935 & $+189\%$ & 7.849 & $+227\%$ \\
+Repetition     & 0.329 & 0.647 & $+97\%$  & 0.474 & $+44\%$  \\
+RecRecencyRank & 0.387 & 0.622 & $+61\%$  & 0.615 & $+59\%$  \\
+Imitation      & 0.563 & 0.808 & $+43\%$  & 0.833 & $+48\%$  \\
+SndInitiation  & 0.702 & 0.920 & $+31\%$  & 0.929 & $+32\%$  \\
+NOTPSnd        & 0.459 & 0.576 & $+25\%$  & 0.767 & $+67\%$  \\
+NITPSnd        & 0.410 & 0.482 & $+18\%$  & 0.688 & $+68\%$  \\
+WeightedRec    & 0.277 & 0.289 & $+5\%$   & 0.392 & $+42\%$  \\
+IOviolation    & 0.732 & 0.544 & $-26\%$  & 0.544 & $-26\%$  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{OutDegSnd: over-breadth.}
+The largest divergence is in sender contact breadth. Human actors contact
+a mean of 2.4 normalized distinct partners; Claude reaches 6.9 ($+189\%$)
+and Llama 7.8 ($+227\%$). LLMs distribute their interactions across far
+more distinct partners than real actors do in any domain.
+
+\paragraph{Repetition and RecRecencyRank: over-concentration on recent history.}
+LLMs re-contact their most recent target at dramatically elevated rates
+(Repetition: $+97\%$ and $+44\%$) and preferentially respond to being
+recently targeted ($+61\%$ for both). Together these biases indicate that
+LLMs over-weight the most recent part of the event history: too sticky
+(returning too often to their last partner) and too responsive (reacting
+too strongly to recent receipt).
+
+\paragraph{IOviolation: under-violation of turn-taking norms.}
+IOviolation is the only statistic both LLMs consistently under-produce.
+Humans violate sequential participation norms in approximately 73\% of events;
+LLMs do so in only 54\% ($-26\%$), with nearly identical deficits for both
+models. LLMs are more politely turn-taking than humans and less likely to
+break conversational rhythm spontaneously.
+
+\paragraph{WeightedRec: best-calibrated.}
+Weighted reciprocity is the most accurately reproduced statistic in the
+roleplay condition. Claude is nearly unbiased ($+5\%$); Llama shows
+moderate over-weighting ($+42\%$).
+
+\subsection{Predict Condition: Divergent Model Behavior}
+
+Table~\ref{tab:predict} reports the statistic-level results for the predict
+condition. The two models diverge markedly.
+
+\begin{table}[H]
+\centering
+\caption{Predict condition: mean endogenous statistic values (human empirical
+vs.\ LLM-generated), averaged across all domains and networks.}
+\label{tab:predict}
+\begin{tabular}{lrrrrrr}
+\toprule
+\multirow{2}{*}{\textbf{Term}} &
+\multirow{2}{*}{\textbf{Empirical}} &
+\multicolumn{2}{c}{\textbf{Claude (Predict)}} &
+\multicolumn{2}{c}{\textbf{Llama (Predict)}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+& & \textbf{Mean} & \textbf{\% bias} & \textbf{Mean} & \textbf{\% bias} \\
+\midrule
+SndInitiation  & 0.702 & 0.318 & $-55\%$ & 0.799 & $+10\%$ \\
+Repetition     & 0.329 & 0.067 & $-80\%$ & 0.410 & $+20\%$ \\
+RecRecencyRank & 0.387 & 0.123 & $-72\%$ & 0.432 & $+7\%$  \\
+WeightedRec    & 0.277 & 0.129 & $-57\%$ & 0.234 & $-16\%$ \\
+Imitation      & 0.563 & 0.309 & $-40\%$ & 0.597 & $+6\%$  \\
+OutDegSnd      & 2.399 & 2.158 & $-10\%$ & 2.868 & $+20\%$ \\
+NOTPSnd        & 0.459 & 0.456 &  $0\%$  & 0.466 & $+2\%$  \\
+NITPSnd        & 0.410 & 0.458 & $+11\%$ & 0.404 & $-1\%$  \\
+IOviolation    & 0.732 & 0.904 & $+23\%$ & 0.522 & $-29\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Claude in predict: systematic under-production of history-dependent statistics.}
+Claude under-produces all four of the robust endogenous baseline statistics
+by large margins: SndInitiation ($-55\%$), Repetition ($-80\%$),
+RecRecencyRank ($-72\%$), WeightedRec ($-57\%$), and Imitation ($-40\%$).
+OutDegSnd, by contrast, is nearly correct ($-10\%$) and triadic closure
+terms are close to empirical baselines. IOviolation is over-produced
+($+23\%$), the opposite direction from the roleplay condition ($-26\%$).
+
+Claude's predict behavior resembles a relatively uniform or novel-contact
+prediction strategy: it forecasts events that ignore established dyadic
+relationships, treating the next event as only weakly conditioned on who
+has interacted with whom before. The IOviolation reversal is consistent
+with this interpretation: when predicting rather than acting,
+Claude treats norm violations as the default rather than the exception,
+perhaps reflecting a belief that human sequences are more spontaneous
+and asymmetric than they actually are.
+
+\paragraph{Llama in predict: near-human calibration.}
+Llama reproduces all nine statistics close to the empirical baseline.
+The largest deviations are OutDegSnd ($+20\%$), Repetition ($+20\%$),
+and IOviolation ($-29\%$). NOTPSnd and NITPSnd are within $2\%$ of
+empirical values. This is the best calibration achieved by either model
+in either condition and represents a qualitatively different behavior
+from Llama's roleplay output, where biases are large and consistent.
+
+\subsection{Condition Comparison: The Roleplay--Predict Reversal}
+
+Table~\ref{tab:compare} places the bias estimates side-by-side to
+highlight the roleplay--predict reversal for each model.
+
+\begin{table}[H]
+\centering
+\caption{Bias comparison across conditions. Cells show
+$(m_{\text{LLM}} - m_{\text{emp}})$ averaged across all domains.
+Arrows indicate direction of bias: $\uparrow$ = over-production,
+$\downarrow$ = under-production.}
+\label{tab:compare}
+\begin{tabular}{lrrrr}
+\toprule
+\multirow{2}{*}{\textbf{Term}} &
+\multicolumn{2}{c}{\textbf{Claude}} &
+\multicolumn{2}{c}{\textbf{Llama}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+& \textbf{Roleplay} & \textbf{Predict} & \textbf{Roleplay} & \textbf{Predict} \\
+\midrule
+SndInitiation  & $+0.218\uparrow$ & $-0.409\downarrow$ & $+0.227\uparrow$ & $+0.076\uparrow$ \\
+Repetition     & $+0.318\uparrow$ & $-0.337\downarrow$ & $+0.145\uparrow$ & $+0.084\uparrow$ \\
+RecRecencyRank & $+0.235\uparrow$ & $-0.309\downarrow$ & $+0.229\uparrow$ & $+0.029\uparrow$ \\
+WeightedRec    & $+0.012\uparrow$ & $-0.170\downarrow$ & $+0.116\uparrow$ & $-0.065\downarrow$ \\
+Imitation      & $+0.245\uparrow$ & $-0.220\downarrow$ & $+0.269\uparrow$ & $+0.033\uparrow$ \\
+OutDegSnd      & $+4.832\uparrow$ & $-0.236\downarrow$ & $+5.893\uparrow$ & $+0.388\uparrow$ \\
+NOTPSnd        & $+0.116\uparrow$ & $+0.053\uparrow$   & $+0.307\uparrow$ & $+0.007\uparrow$ \\
+NITPSnd        & $+0.072\uparrow$ & $+0.134\uparrow$   & $+0.278\uparrow$ & $-0.008\downarrow$ \\
+IOviolation    & $-0.188\downarrow$ & $+0.157\uparrow$ & $-0.214\downarrow$ & $-0.251\downarrow$ \\
+\midrule
+\textbf{RMSE} & \textbf{1.661} & \textbf{0.329} & \textbf{2.024} & \textbf{0.189} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For Claude, every history-dependent statistic reverses sign between
+conditions: over-production in roleplay becomes under-production in
+predict, and the IOviolation deficit becomes an IOviolation surplus.
+The reversal is consistent across all five forward- and reverse-dyad
+statistics and across all nine domains. For Llama, the transition from
+roleplay to predict does not involve reversals but compressions: all
+biases move toward zero.
+
+\subsection{Domain-Level RMSE}
+
+Tables~\ref{tab:rmse_roleplay} and~\ref{tab:rmse_predict} report RMSE
+by domain for the roleplay and predict conditions, respectively.
+
+\begin{table}[H]
+\centering
+\caption{Roleplay condition: RMSE by domain and model.}
+\label{tab:rmse_roleplay}
+\begin{tabular}{llllrr}
+\toprule
+\textbf{Domain} & \textbf{Vis.} & \textbf{Val.} &
+\textbf{Nets} & \textbf{Claude} & \textbf{Llama} \\
+\midrule
+War       & High & Conflictual & 1 & 0.134 & 0.836 \\
+Email     & Low  & Affiliative & 5 & 0.292 & 0.206 \\
+ftf       & Low  & Affiliative & 5 & 0.443 & 0.346 \\
+Classroom & High & Affiliative & 1 & 0.600 & 0.444 \\
+Gangs     & High & Conflictual & 5 & 1.015 & 1.081 \\
+Twitter   & High & Affiliative & 1 & 1.529 & 1.630 \\
+PMs       & Low  & Affiliative & 5 & 2.042 & 2.460 \\
+Phone     & High & Affiliative & 1 & 2.288 & 2.609 \\
+SMS       & Low  & Affiliative & 3 & 7.106 & 8.821 \\
+\midrule
+\textbf{Overall} & & & 27 & \textbf{1.661} & \textbf{2.024} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Predict condition: RMSE by domain and model.}
+\label{tab:rmse_predict}
+\begin{tabular}{llllrr}
+\toprule
+\textbf{Domain} & \textbf{Vis.} & \textbf{Val.} &
+\textbf{Nets} & \textbf{Claude} & \textbf{Llama} \\
+\midrule
+ftf       & Low  & Affiliative & 5 & 0.214 & 0.051 \\
+Gangs     & High & Conflictual & 5 & 0.198 & 0.258 \\
+PMs       & Low  & Affiliative & 5 & 0.230 & 0.160 \\
+Twitter   & High & Affiliative & 1 & 0.312 & 0.229 \\
+Phone     & High & Affiliative & 1 & 0.364 & 0.138 \\
+Email     & Low  & Affiliative & 5 & 0.382 & 0.551 \\
+War       & High & Conflictual & 1 & 0.398 & 0.106 \\
+Classroom & High & Affiliative & 1 & 0.408 & 0.144 \\
+SMS       & Low  & Affiliative & 3 & 0.505 & 0.108 \\
+\midrule
+\textbf{Overall} & & & 27 & \textbf{0.329} & \textbf{0.189} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In the roleplay condition (Table~\ref{tab:rmse_roleplay}), RMSE is
+lowest in adversarial or formal settings (War, Email, ftf) and highest
+in informal high-volume settings (SMS, Phone, PMs), driven primarily by
+OutDegSnd over-production which is most severe in contexts where human
+interaction is tightly concentrated on a small number of partners.
+
+In the predict condition (Table~\ref{tab:rmse_predict}), the domain
+ordering changes substantially. SMS, which produced the worst roleplay
+performance, falls to mid-range for both models (Claude: 0.505; Llama:
+0.108) because OutDegSnd is now much more accurately reproduced. Llama
+achieves its lowest RMSE in ftf networks (0.051), where human interaction
+is tightly structured and the predict task is relatively constrained.
+Notably, Email is now one of Llama's \emph{worse} domains (0.551),
+reversing its roleplay performance---suggesting that Llama's accurate
+prediction of email-like dyadic sequences in roleplay relies partly on
+identity assignment rather than pure sequence forecasting.
+
+%------------------------------------------------------------------
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Two Failure Modes, One Contrast}
+
+The comparison between conditions reveals a fundamental asymmetry in how
+LLMs represent social interaction under different framing conditions.
+
+In the \emph{roleplay} condition, LLMs over-endogenize: they behave as if
+the pull of prior interaction history is stronger than it actually is for
+humans. They return to established partners too often, respond too strongly
+to recent receipt, engage too many distinct partners, and follow popular
+targets too readily. This pattern is consistent with LLMs having internalized
+the \emph{structure} of endogenous interaction but having over-fitted to it---
+amplifying tendencies that are present in human behavior but exaggerating
+their magnitude when adopting a specific agent identity. The pattern
+parallels what \citet{cheng2023compost} call \emph{caricature} in
+demographic persona simulation: the identity frame activates and exaggerates
+the tendencies associated with that identity rather than accurately reproducing
+them, producing a heightened version of structural social behavior rather than
+a calibrated one. \citet{shanahan2023role}'s concept of \emph{character
+capture} provides a complementary account: the roleplay framing can override
+baseline model behavior and commit the LLM to acting consistently with the
+assigned identity's implied tendencies, even when those tendencies are stronger
+than empirically warranted.
+
+In the \emph{predict} condition, Claude reverses course entirely:
+it under-produces history-dependent statistics by margins that are as large
+as its over-production in roleplay. This is not a calibration improvement; it
+is a different error. Claude in predict mode behaves as if social sequences are
+\emph{less} structured than they are---as if the next event is only weakly
+determined by who has interacted with whom before. Llama, by contrast, shifts
+toward the empirical baseline without reversing, suggesting a more stable
+underlying representation of sequence statistics.
+
+\subsection{Interpreting Claude's Predict Behavior}
+
+Claude's predict-condition behavior suggests a framing-sensitive
+representational shift. When asked to \emph{act} as an agent, Claude
+activates a high-inertia social model: return to established partners, follow
+network structure, respect turn-taking. When asked to \emph{forecast} what
+will happen next in a sequence, Claude appears to activate a different model---
+one that discounts dyadic history and treats the next event as relatively
+unconditioned on the past. The IOviolation reversal is the clearest marker:
+in roleplay, Claude is excessively compliant (under-violating turn-taking
+norms); in predict, it forecasts that norm violations are common (over-producing
+IOviolation). The empirical truth is between these two representations.
+
+One interpretation is that Claude has two separable implicit models of
+social interaction: an \emph{actor model} (used when role-playing an identity)
+and a \emph{forecaster model} (used when predicting). The actor model is
+high-inertia and norm-compliant; the forecaster model is flatter and
+violation-tolerant. Neither is well-calibrated in isolation, but they err
+in different directions. This is consistent with \citet{tseng2024two}'s
+argument that role-playing and prediction (personalization) are distinct
+paradigms with distinct failure modes: conflating them obscures the fact
+that what makes an LLM a good actor may be precisely what makes it a poor
+forecaster, and vice versa. The coincidental near-accuracy of Claude's
+predict RMSE (0.33) is thus misleading: the errors cancel across statistics
+rather than reflecting genuine calibration.
+
+\subsection{Interpreting Llama's Predict Accuracy}
+
+Llama's near-perfect calibration in the predict condition (RMSE 0.19,
+mean bias $+0.04$) is the most surprising result in this study. Without
+any identity assignment or structural scaffolding, Llama reproduces human
+interaction statistics nearly exactly on average across nine social domains.
+
+This accuracy may reflect something substantive about Llama's pretraining
+data and representational strategy. One possibility is that Llama has
+encoded a more accurate \emph{base rate} model of human social interaction
+at the sequence level---a statistical summary of who acts and who they target
+that is well-calibrated at the population level even if it does not represent
+any specific actor's perspective. When asked to forecast the next event,
+Llama draws from this base rate model and produces sequences that match the
+empirical distribution. When asked to role-play a specific identity, however,
+Llama over-exaggerates the structural tendencies implied by that identity,
+producing the large positive biases observed in the roleplay condition.
+
+Critically, Llama's predict accuracy should not be taken to mean that Llama
+is a better social model overall. In the roleplay condition---where
+identity assignment is the realistic framing for agent-based simulation---
+Llama's biases are larger than Claude's. The predict accuracy is best
+understood as Llama having a well-calibrated \emph{sequence-level prior}
+that is decoupled from its \emph{identity-conditioned behavior}.
+
+\subsection{The Visibility and Valence of Bias}
+
+Domain-level RMSE patterns differ markedly between conditions, and the
+changes are informative about what each condition is measuring.
+
+In roleplay, the worst performance is in SMS and PMs---low-visibility,
+informal, high-volume dyadic settings---primarily because OutDegSnd
+over-production is most severe where human actors concentrate most tightly
+on a small number of partners. LLMs continue to spread attention broadly
+regardless of context.
+
+In predict, the domain ordering flattens dramatically, and SMS is
+no longer an outlier. This is because Claude and Llama now choose senders
+themselves, and their sender-selection behavior moderates some of the
+extreme breadth bias. The removal of REM-governed sender activation
+apparently allows more natural variation in who initiates contact, which
+pulls OutDegSnd closer to the empirical baseline.
+
+The War domain is the most consistent high performer in roleplay (Claude
+RMSE: 0.134) but becomes mid-range in predict for Claude (0.398) and low
+for Llama (0.106). This reversal for Claude suggests that the War domain's
+strong roleplay performance was substantially driven by the REM-governed
+sender activation concentrating events on historically active conflict
+dyads, rather than Claude's own calibrated forecasting of conflict dynamics.
+Llama's War predict accuracy (0.106) supports a different interpretation:
+Llama has genuinely internalized the statistical structure of conflict
+sequences well enough to forecast them without scaffolding.
+
+\subsection{Implications for Social Simulation}
+
+The results suggest four practical recommendations for researchers
+deploying LLMs in social simulation:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Condition choice matters as much as model choice.}
+        The performance gap between conditions (RMSE 0.19--2.02) is
+        larger than the gap between models ($\leq 0.4$ within condition).
+        Before selecting a provider, researchers should determine whether
+        their application calls for roleplay (identity-based) or predictive
+        simulation, as the appropriate calibration target differs
+        substantially.
+
+  \item \textbf{Roleplay over-endogeneity requires explicit correction.}
+        When using LLMs as identity-assigned agents, OutDegSnd,
+        Repetition, and RecRecencyRank will all be substantially
+        over-produced. Applications that care about network density,
+        partner concentration, or sequence statistics should post-correct
+        or re-parameterize the prompt to penalize over-repetition and
+        over-breadth.
+
+  \item \textbf{Predict-condition Claude under-produces dyadic structure.}
+        For sequence forecasting applications, Claude should not be relied
+        upon to reproduce dyadic persistence or reverse-dyad recency
+        without additional prompting that explicitly reminds the model to
+        weight prior interaction history in its predictions.
+
+  \item \textbf{Llama predict is the strongest off-the-shelf forecaster.}
+        For applications requiring aggregate sequence statistics without
+        identity assignment, Llama 3.1 70B in the predict condition provides
+        the best available calibration across a wide range of social domains.
+\end{enumerate}
+
+\subsection{Limitations}
+
+Several limitations bound these conclusions. First, the roleplay
+architecture governs sender activation via the empirical REM hazard
+surface, which may counteract some LLM-native biases. Purely unconstrained
+roleplay (LLM-governed sender activation) might show different, possibly
+larger, biases. The roleplay results are thus conservative lower bounds
+on the calibration gap under fully endogenous conditions.
+
+Second, both conditions use generic role prompts. Domain-specific prompting
+that provides LLMs with detailed sociological context about interaction
+norms in each setting might improve calibration, particularly for the
+predict condition where no identity frame is provided. Whether the biases
+documented here are fundamental to LLM social representations or
+prompt-sensitivity artifacts remains an open question.
+
+Third, the evaluation covers nine statistics from one candidate set.
+\citet{gibson2025four} find that these nine statistics, plus three others
+(DyadRecencyLog, RecRecencyLog, RRecInitiation), capture approximately 97\%
+of the AIC improvement achievable from a twelve-term endogenous candidate
+set---but LLM biases on terms not represented here cannot be ruled out.
+
+Fourth, Llama's predict accuracy---while genuine---may not generalize to
+settings or domains not represented in this corpus. The nine domains here
+are diverse, but they all involve human social interaction in Anglophone
+contexts, and they are all represented in the kind of text data on which
+large language models are typically trained.
+
+%------------------------------------------------------------------
+\section{Conclusion}
+
+We have shown that LLMs behave differently as social actors than as social
+forecasters, and that the two behaviors err in systematically different
+directions. In the roleplay condition, both Claude Haiku 4.5 and Llama 3.1
+70B over-produce history-dependent interaction statistics---too much
+repetition, recency-seeking, contact breadth, and imitation---while
+under-producing the spontaneous norm violations that characterize real
+human interaction. In the predict condition, Claude reverses these biases,
+sharply under-producing the same history-dependent statistics, while Llama
+converges on the empirical baseline with near-human accuracy.
+
+These findings resist a simple ``more scaffolding is better'' or ``predict
+is harder'' interpretation. Llama's predict accuracy is not an artifact of
+the task being easy; it reflects a well-calibrated implicit model of
+sequence-level social dynamics that is decoupled from the over-exaggeration
+of identity-conditioned behavior in roleplay. Claude, by contrast, has two
+poorly calibrated but internally coherent models---an actor model that
+over-structures behavior and a forecaster model that under-structures it---
+neither of which is close to correct.
+
+For the growing community of researchers deploying LLMs as social simulation
+agents, these results argue for treating the interaction between model choice
+and condition framing as a primary design variable, not a secondary concern.
+The same LLM that produces acceptable results in one framing may be
+severely miscalibrated in another. Before treating LLM-generated interaction
+sequences as valid proxies for human behavior, empirical calibration across
+the endogenous statistics that structure real social interaction is warranted.
+
+%------------------------------------------------------------------
+\section*{Acknowledgements}
+
+\placeholder{Insert acknowledgements here.}
+
+\section*{Conflicts of Interest}
+
+The author declares no conflicts of interest.
+
+\section*{Data Availability Statement}
+
+The empirical sequences used in this study are drawn from multiple
+previously published corpora. \placeholder{Specify dataset availability.}
+Analysis code and generated sequences are available at
+\url{https://github.com/\ldots}.
+
+%------------------------------------------------------------------
+\bibliography{cites}
+\bibliographystyle{plainnat}
+
+\end{document}

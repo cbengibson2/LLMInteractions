@@ -1,0 +1,67 @@
+# Large result files -- regenerate by running analysis scripts
+multiagent_multidomain_results.RData
+multidomain_results.RData
+predict_multidomain_results.RData
+study3_results.RData
+study3_sequences.RData
+rem_empirical.Rdata
+conflict.Rdata
+conflict.Rdatadf.Rdata
+demo_multiagent_results.RData
+probe_results.RData
+probe_results_multidomain.RData
+checkpoint.Rdata
+
+# Checkpoint directories -- intermediate API call state
+checkpoints_multiagent/
+checkpoints_multiagent_multidomain/
+checkpoints_multidomain/
+checkpoints_predict_multidomain/
+checkpoints_study3/
+checkpoints_wargame/
+
+# Generated figures (regenerate from scripts)
+compare_bias_heatmap.pdf
+compare_rmse.pdf
+compare_term_bias.pdf
+multiagent_multidomain_bias.pdf
+multiagent_multidomain_rmse.pdf
+multiagent_multidomain_suffstat.pdf
+multidomain_ntriadic.pdf
+multidomain_suffstat.pdf
+study3_coef_comparison.pdf
+study3_suffstat_comparison.pdf
+demo_sender_probs.pdf
+Rplots.pdf
+
+# Rendered documents (regenerate from Rmd)
+study3_results.html
+multiagent_results.html
+rand_wargaming_proposal.html
+endogenous_conflict_proposal.html
+
+# Proposal / planning documents -- not for public distribution
+rand_wargaming_proposal.Rmd
+rand_wargaming_proposal.html
+endogenous_conflict_proposal.Rmd
+endogenous_conflict_proposal.html
+
+# Reference / background materials
+Do LLMs Know How Wars Work_.htm
+
+# LaTeX build artifacts
+paper/*.synctex.gz
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+
+# R session artifacts
+.Rhistory
+.RData
+.Rproj.user/
+
+# macOS
+.DS_Store
